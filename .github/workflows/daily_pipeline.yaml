@@ -63,7 +63,7 @@ jobs:
         # Required mail server address if not connection_url:
         server_address: smtp.ionos.com
         # Server port, default 25:
-        server_port: 587
+        server_port: 465
         username: ${{secrets.MAIL_USERNAME}}
         password: ${{secrets.MAIL_PASSWORD}}
         secure: true
