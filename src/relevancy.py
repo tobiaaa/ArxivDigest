@@ -39,29 +39,15 @@ def post_process_chat_gpt_response(paper_data, response, threshold_score=8):
     selected_data = []
     if response is None:
         return []
-    json_items = response['message']['content'].replace("\n\n", "\n").split("\n")
-    pattern = r"^\d+\. |\\"
-    import pprint
+    json_items = response['message']['content'].replace("\n\n", "\n")
     score_items = []
-    for line in json_items:
-        print(line)
-        if 'relevancy score' not in line.lower():
-            continue
+    for match in re.finditer(r'\{[^{}]*\}', json_items):
         try:
-            score = json.loads(re.sub(pattern, '', line))
-        except Exception as e:
-            print(line)
-            print(e)
-            continue
-        score_items.append(score)
-    # try:
-    #     score_items = [
-    #         json.loads(re.sub(pattern, "", line))
-    #         for line in json_items if "relevancy score" in line.lower()]
-    # except Exception:
-    #     pprint.pprint([re.sub(pattern, "", line) for line in json_items if "relevancy score" in line.lower()])
-    #     raise RuntimeError("failed")
-    # pprint.pprint(score_items)
+            score_items.append(json.loads(match.group()))
+        except json.JSONDecodeError as e:
+            print(match.group())
+            pass
+
     scores = []
     for item in score_items:
         temp = item["Relevancy score"]
@@ -112,7 +98,6 @@ def generate_relevance_score(
     sorting=True
 ):
     ans_data = []
-    request_idx = 1
     hallucination = False
     for id in tqdm.tqdm(range(0, len(all_papers), num_paper_in_prompt)):
         prompt_papers = all_papers[id:id+num_paper_in_prompt]
@@ -133,16 +118,14 @@ def generate_relevance_score(
             decoding_args=decoding_args,
             logit_bias={"100257": -100},  # prevent the <|endoftext|> from being generated
         )
-        print("response", response['message']['content'])
+        # print("response", response['message']['content'])
         request_duration = time.time() - request_start
 
-        process_start = time.time()
         batch_data, hallu = post_process_chat_gpt_response(prompt_papers, response, threshold_score=threshold_score)
         hallucination = hallucination or hallu
         ans_data.extend(batch_data)
 
-        print(f"Request {request_idx+1} took {request_duration:.2f}s")
-        print(f"Post-processing took {time.time() - process_start:.2f}s")
+        print(f"Request took {request_duration:.2f}s")
 
     if sorting:
         ans_data = sorted(ans_data, key=lambda x: int(x["Relevancy score"]), reverse=True)

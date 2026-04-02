@@ -1,5 +1,6 @@
 # encoding: utf-8
 import os
+import re
 import tqdm
 from bs4 import BeautifulSoup as bs
 import urllib.request
@@ -27,10 +28,15 @@ def _download_new_papers(field_abbr):
     for i in tqdm.tqdm(range(len(dt_list))):
         paper = {}
         paper_number = dt_list[i].text.strip().split(" ")[2].split(":")[-1]
+        paper_number = re.search(r'arxiv:(\d{4}.\d+)', dt_list[i].text.strip(), re.IGNORECASE)
+        if paper_number is not None:
+            paper_number = paper_number.group(1)
+        else:
+            continue
         paper['main_page'] = arxiv_base + paper_number
         paper['pdf'] = arxiv_base.replace('abs', 'pdf') + paper_number
 
-        paper['title'] = dd_list[i].find("div", {"class": "list-title mathjax"}).text.replace("Title: ", "").strip()
+        paper['title'] = dd_list[i].find("div", {"class": "list-title mathjax"}).text.replace("Title:", "").strip()
         paper['authors'] = dd_list[i].find("div", {"class": "list-authors"}).text \
                             .replace("Authors:\n", "").replace("\n", "").strip()
         paper['subjects'] = dd_list[i].find("div", {"class": "list-subjects"}).text.replace("Subjects: ", "").strip()
@@ -51,7 +57,7 @@ def _download_new_papers(field_abbr):
 
 
 def get_papers(field_abbr, limit=None):
-    date = datetime.date.fromtimestamp(datetime.datetime.now(tz=pytz.timezone("America/New_York")).timestamp())
+    date = datetime.datetime.now().date()
     date = date.strftime("%a, %d %b %y")
     if not os.path.exists(f"./data/{field_abbr}_{date}.jsonl"):
         _download_new_papers(field_abbr)

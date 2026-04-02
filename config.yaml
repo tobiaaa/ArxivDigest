@@ -10,7 +10,7 @@ categories:
 # will have their papers filtered out.
 #
 # Must be within 1-10
-threshold: 5
+threshold: 7
 
 # A natural language statement that the large language model will use to judge which papers are relevant
 #
@@ -24,6 +24,8 @@ threshold: 5
 interest: |
   1. Test-time adaptation for speech enhancement
   2. Domain adaptation for speech enhancement
-  3. Test-time adaptation for non-classification tasks
-  4. Not interested in paper focus on specific languages, e.g., Arabic, Chinese, etc.
-  5. Novel evaluation of speech enhancement methods
+  3. Test-time adaptation for regression tasks or similar
+  4. Not interested in paper focus on specific languages, e.g., Arabic, Chinese, etc. unless directly relevant to TTA for SE
+  5. Not interested in LLM papers unless directly relevant to TTA for SE
+  6. Novel evaluation of speech enhancement methods
+  7. Not interested in general ML papers that apply known techniques to new domains

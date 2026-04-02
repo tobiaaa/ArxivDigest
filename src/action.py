@@ -249,7 +249,7 @@ def generate_body(topic, categories, interest, threshold):
             threshold_score=threshold,
             num_paper_in_prompt=16,
         )
-        body = "<h1>Arxiv Digest</h1>"
+        body = date.today().strftime("<h1>Arxiv Digest %d %b %Y</h1>")
         body += "<br><br>".join(
             [
                 f'Title: <a href="{paper["main_page"]}">{paper["title"]}</a><br>Authors: {paper["authors"]}<br>Score: {paper["Relevancy score"]}<br>Reason: {paper["Reasons for match"]}'
