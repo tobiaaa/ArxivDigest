@@ -31,7 +31,7 @@ def encode_prompt(query, prompt_papers):
         prompt += f"{idx + 1}. Authors: {authors}\n"
         prompt += f"{idx + 1}. Abstract: {abstract}\n"
     prompt += f"\n Generate response:\n1."
-    print(prompt)
+    # print(prompt)
     return prompt
 
 
@@ -42,14 +42,26 @@ def post_process_chat_gpt_response(paper_data, response, threshold_score=8):
     json_items = response['message']['content'].replace("\n\n", "\n").split("\n")
     pattern = r"^\d+\. |\\"
     import pprint
-    try:
-        score_items = [
-            json.loads(re.sub(pattern, "", line))
-            for line in json_items if "relevancy score" in line.lower()]
-    except Exception:
-        pprint.pprint([re.sub(pattern, "", line) for line in json_items if "relevancy score" in line.lower()])
-        raise RuntimeError("failed")
-    pprint.pprint(score_items)
+    score_items = []
+    for line in json_items:
+        print(line)
+        if 'relevancy score' not in line.lower():
+            continue
+        try:
+            score = json.loads(re.sub(pattern, '', line))
+        except Exception as e:
+            print(line)
+            print(e)
+            continue
+        score_items.append(score)
+    # try:
+    #     score_items = [
+    #         json.loads(re.sub(pattern, "", line))
+    #         for line in json_items if "relevancy score" in line.lower()]
+    # except Exception:
+    #     pprint.pprint([re.sub(pattern, "", line) for line in json_items if "relevancy score" in line.lower()])
+    #     raise RuntimeError("failed")
+    # pprint.pprint(score_items)
     scores = []
     for item in score_items:
         temp = item["Relevancy score"]
@@ -83,6 +95,8 @@ def find_word_in_string(w, s):
 
 
 def process_subject_fields(subjects):
+    if '\n' in subjects:
+        subjects = subjects.split('\n')[1]
     all_subjects = subjects.split(";")
     all_subjects = [s.split(" (")[0] for s in all_subjects]
     return all_subjects
@@ -119,7 +133,7 @@ def generate_relevance_score(
             decoding_args=decoding_args,
             logit_bias={"100257": -100},  # prevent the <|endoftext|> from being generated
         )
-        print ("response", response['message']['content'])
+        print("response", response['message']['content'])
         request_duration = time.time() - request_start
 
         process_start = time.time()
@@ -139,7 +153,7 @@ def run_all_day_paper(
     query={"interest":"", "subjects":["Computation and Language", "Artificial Intelligence"]},
     date=None,
     data_dir="../data",
-    model_name="gpt-3.5-turbo-16k",
+    model_name="gpt-5-nano",
     threshold_score=8,
     num_paper_in_prompt=8,
     temperature=0.4,
