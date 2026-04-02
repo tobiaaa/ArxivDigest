@@ -33,7 +33,7 @@ jobs:
         FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
         TO_EMAIL: ${{ secrets.TO_EMAIL }}
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: digest.html
         path: digest.html
