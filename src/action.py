@@ -4,6 +4,7 @@ from sendgrid.helpers.mail import Mail, Email, To, Content
 from datetime import date
 
 import argparse
+import logging
 import yaml
 import os
 from dotenv import load_dotenv
@@ -221,29 +222,50 @@ category_map = {
 }
 
 
-def generate_body(topic, categories, interest, threshold):
+def get_field_abbr(topic):
     if topic == "Physics":
         raise RuntimeError("You must choose a physics subtopic.")
     elif topic in physics_topics:
-        abbr = physics_topics[topic]
+        return physics_topics[topic]
     elif topic in topics:
-        abbr = topics[topic]
+        return topics[topic]
     else:
         raise RuntimeError(f"Invalid topic {topic}")
-    if categories:
-        for category in categories:
-            if category not in category_map[topic]:
-                raise RuntimeError(f"{category} is not a category of {topic}")
+
+
+def generate_body(topic_configs, interest, threshold):
+    seen = {}  # main_page -> paper, for deduplication across topics
+    for entry in topic_configs:
+        topic = entry["topic"]
+        categories = entry.get("categories", [])
+        abbr = get_field_abbr(topic)
+        if categories:
+            for category in categories:
+                if category not in category_map[topic]:
+                    raise RuntimeError(f"{category} is not a category of {topic}")
         papers = get_papers(abbr)
-        papers = [
-            t
-            for t in papers
-            if bool(set(process_subject_fields(t["subjects"])) & set(categories))
-        ]
-    else:
-        papers = get_papers(abbr)
+        if categories:
+            papers = [
+                t
+                for t in papers
+                if bool(set(process_subject_fields(t["subjects"])) & set(categories))
+            ]
+        for paper in papers:
+            seen.setdefault(paper["main_page"], paper)
+    papers = list(seen.values())
+    for paper in papers:
+        paper_subjects = process_subject_fields(paper["subjects"])
+        matched = []
+        for entry in topic_configs:
+            cats = entry.get("categories", [])
+            matched_cats = [c for c in cats if c in paper_subjects]
+            if matched_cats:
+                matched.append(f"{entry['topic']} ({', '.join(matched_cats)})")
+            elif not cats:
+                matched.append(entry["topic"])
+        paper["matched_topics"] = " · ".join(matched)
     if interest:
-        relevancy, hallucination = generate_relevance_score(
+        relevancy = generate_relevance_score(
             papers,
             query={"interest": interest},
             threshold_score=threshold,
@@ -252,21 +274,16 @@ def generate_body(topic, categories, interest, threshold):
         body = date.today().strftime("<h1>Arxiv Digest %d %b %Y</h1>")
         body += "<br><br>".join(
             [
-                f'Title: <a href="{paper["main_page"]}">{paper["title"]}</a><br>Authors: {paper["authors"]}<br>Score: {paper["Relevancy score"]}<br>Reason: {paper["Reasons for match"]}'
+                f'Title: <a href="{paper["main_page"]}">{paper["title"]}</a><br>Authors: {paper["authors"]}<br>Subjects: {paper["matched_topics"]}<br>Score: {paper["Relevancy score"]}<br>Reason: {paper["Reasons for match"]}'
                 for paper in relevancy
             ]
         )
         if len(relevancy) == 0:
             body += "<br>No relevant papers today"
-        if hallucination:
-            body = (
-                "Warning: the model hallucinated some papers. We have tried to remove them, but the scores may not be accurate.<br><br>"
-                + body
-            )
     else:
         body = "<br><br>".join(
             [
-                f'Title: <a href="{paper["main_page"]}">{paper["title"]}</a><br>Authors: {paper["authors"]}'
+                f'Title: <a href="{paper["main_page"]}">{paper["title"]}</a><br>Authors: {paper["authors"]}<br>Subjects: {paper["matched_topics"]}'
                 for paper in papers
             ]
         )
@@ -274,6 +291,7 @@ def generate_body(topic, categories, interest, threshold):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     # Load the .env file.
     load_dotenv()
     parser = argparse.ArgumentParser()
@@ -288,13 +306,12 @@ if __name__ == "__main__":
         raise RuntimeError("No openai api key found")
     openai.api_key = os.environ.get("OPENAI_API_KEY")
 
-    topic = config["topic"]
-    categories = config["categories"]
+    topic_configs = config["topics"]
     from_email = os.environ.get("FROM_EMAIL")
     to_email = os.environ.get("TO_EMAIL")
     threshold = config["threshold"]
     interest = config["interest"]
-    body = generate_body(topic, categories, interest, threshold)
+    body = generate_body(topic_configs, interest, threshold)
     with open("digest.html", "w") as f:
         f.write(body)
     if os.environ.get("SENDGRID_API_KEY", None):
@@ -309,8 +326,8 @@ if __name__ == "__main__":
         # Send an HTTP POST request to /mail/send
         response = sg.client.mail.send.post(request_body=mail_json)
         if response.status_code >= 200 and response.status_code <= 300:
-            print("Send test email: Success!")
+            logging.info("Email sent successfully")
         else:
-            print("Send test email: Failure ({response.status_code}, {response.text})")
+            logging.error(f"Failed to send email ({response.status_code}: {response.text})")
     else:
-        print("No sendgrid api key found. Skipping email")
+        logging.info("No SendGrid API key found, skipping email")

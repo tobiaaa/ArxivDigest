@@ -1,10 +1,12 @@
 # For physics topics, use the specific subtopics, e.g. "Astrophysics"
-topic: "Computer Science"
-# An empty list here will include all categories in a topic
+# An empty categories list will include all categories in a topic.
 # Use the natural language names of the topics, found here: https://arxiv.org
 # Including more categories will result in more calls to the large language model
-categories:
-  ["Artificial Intelligence", "Computation and Language", "Machine Learning"]
+topics:
+  - topic: "Computer Science"
+    categories: ["Artificial Intelligence", "Computation and Language", "Machine Learning", "Sound"]
+  - topic: "Electrical Engineering and Systems Science"
+    categories: ["Audio and Speech Processing", "Signal Processing"]
 
 # Relevance score threshold. abstracts that receive a score less than this from the large language model
 # will have their papers filtered out.

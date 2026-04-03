@@ -2,14 +2,11 @@ import dataclasses
 import logging
 import math
 import os
-import io
 import sys
 import time
-import json
 from typing import Optional, Sequence, Union
 
 import openai
-import tqdm
 from openai import openai_object
 import copy
 
@@ -69,7 +66,6 @@ def openai_completion(
             - an openai_object.OpenAIObject object (if return_text is False)
             - a list of objects of the above types (if decoding_args.n > 1)
     """
-    is_chat_model = "gpt-3.5" in model_name or "gpt-4" in model_name
     is_single_prompt = isinstance(prompts, (str, dict))
     if is_single_prompt:
         prompts = [prompts]
@@ -89,11 +85,7 @@ def openai_completion(
     ]
 
     completions = []
-    for batch_id, prompt_batch in tqdm.tqdm(
-        enumerate(prompt_batches),
-        desc="prompt_batches",
-        total=len(prompt_batches),
-    ):
+    for prompt_batch in prompt_batches:
         batch_decoding_args = copy.deepcopy(decoding_args)  # cloning the decoding_args
 
         backoff = 3
@@ -105,16 +97,13 @@ def openai_completion(
                     **batch_decoding_args.__dict__,
                     **decoding_kwargs,
                 )
-                if is_chat_model:
-                    completion_batch = openai.ChatCompletion.create(
-                        messages=[
-                            {"role": "system", "content": "You are a helpful assistant."},
-                            {"role": "user", "content": prompt_batch[0]}
-                        ],
-                        **shared_kwargs
-                    )
-                else:
-                    completion_batch = openai.Completion.create(prompt=prompt_batch, **shared_kwargs)
+                completion_batch = openai.ChatCompletion.create(
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": prompt_batch[0]}
+                    ],
+                    **shared_kwargs
+                )
 
                 choices = completion_batch.choices
 

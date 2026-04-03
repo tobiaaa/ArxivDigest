@@ -1,7 +1,7 @@
 # encoding: utf-8
 import os
 import re
-import tqdm
+import logging
 from bs4 import BeautifulSoup as bs
 import urllib.request
 import json
@@ -12,7 +12,7 @@ import pytz
 def _download_new_papers(field_abbr):
     NEW_SUB_URL = f'https://arxiv.org/list/{field_abbr}/new'  # https://arxiv.org/list/cs/new
     page = urllib.request.urlopen(NEW_SUB_URL)
-    soup = bs(page)
+    soup = bs(page, "html.parser")
     content = soup.body.find("div", {'id': 'content'})
 
     # find the first h3 element in content
@@ -25,9 +25,8 @@ def _download_new_papers(field_abbr):
 
     assert len(dt_list) == len(dd_list)
     new_paper_list = []
-    for i in tqdm.tqdm(range(len(dt_list))):
+    for i in range(len(dt_list)):
         paper = {}
-        paper_number = dt_list[i].text.strip().split(" ")[2].split(":")[-1]
         paper_number = re.search(r'arxiv:(\d{4}.\d+)', dt_list[i].text.strip(), re.IGNORECASE)
         if paper_number is not None:
             paper_number = paper_number.group(1)
@@ -43,6 +42,7 @@ def _download_new_papers(field_abbr):
         paper['abstract'] = dd_list[i].find("p", {"class": "mathjax"}).text.replace("\n", " ").strip()
         new_paper_list.append(paper)
 
+    logging.info(f"Fetched {len(new_paper_list)} papers for {field_abbr} (arXiv listing: {date})")
 
     #  check if ./data exist, if not, create it
     if not os.path.exists("./data"):
