@@ -8,7 +8,6 @@ import logging
 import yaml
 import os
 from dotenv import load_dotenv
-import openai
 from relevancy import generate_relevance_score, process_subject_fields
 from download_new_papers import get_papers
 
@@ -304,7 +303,6 @@ if __name__ == "__main__":
 
     if "OPENAI_API_KEY" not in os.environ:
         raise RuntimeError("No openai api key found")
-    openai.api_key = os.environ.get("OPENAI_API_KEY")
 
     topic_configs = config["topics"]
     from_email = os.environ.get("FROM_EMAIL")

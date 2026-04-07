@@ -1,12 +1,20 @@
-import json
-import logging
-import re
 import tqdm
+from typing import List
+from pydantic import BaseModel
 import utils
 
 
 with open("src/relevancy_prompt.txt") as f:
     _RELEVANCY_PROMPT = f.read()
+
+
+class PaperScore(BaseModel):
+    relevancy_score: int
+    reasons_for_match: str
+
+
+class RelevancyBatch(BaseModel):
+    papers: List[PaperScore]
 
 
 def encode_prompt(query, prompt_papers):
@@ -22,42 +30,7 @@ def encode_prompt(query, prompt_papers):
         prompt += f"{idx + 1}. Title: {title}\n"
         prompt += f"{idx + 1}. Authors: {authors}\n"
         prompt += f"{idx + 1}. Abstract: {abstract}\n"
-    prompt += f"\n Generate response:\n1."
-    # print(prompt)
     return prompt
-
-
-def post_process_chat_gpt_response(paper_data, response, threshold_score=8):
-    if response is None:
-        return []
-    content = response['message']['content']
-
-    # Match numbered entries like "1. {...}" using the number as the paper index.
-    # This is resilient to parse failures: a bad entry for paper N does not shift
-    # the association for papers N+1, N+2, ...
-    scored = {}
-    for match in re.finditer(r'(\d+)\.\s*(\{[^{}]*\})', content, re.DOTALL):
-        idx = int(match.group(1)) - 1  # prompt numbers are 1-based
-        if idx < 0 or idx >= len(paper_data):
-            continue
-        try:
-            scored[idx] = json.loads(match.group(2))
-        except json.JSONDecodeError:
-            logging.warning(f"Failed to parse JSON for paper {idx + 1}: {match.group(2)!r}")
-
-    selected_data = []
-    for idx, item in sorted(scored.items()):
-        temp = item.get("Relevancy score", 0)
-        if isinstance(temp, str) and "/" in temp:
-            score = int(temp.split("/")[0])
-        else:
-            score = int(temp)
-        if score < threshold_score:
-            continue
-        paper_data[idx]["Relevancy score"] = score
-        paper_data[idx]["Reasons for match"] = item.get("Reasons for match", "")
-        selected_data.append(paper_data[idx])
-    return selected_data
 
 
 def process_subject_fields(subjects):
@@ -70,7 +43,7 @@ def process_subject_fields(subjects):
 def generate_relevance_score(
     all_papers,
     query,
-    model_name="gpt-3.5-turbo-16k",
+    model_name="gpt-4o-mini",
     threshold_score=8,
     num_paper_in_prompt=4,
     temperature=0.4,
@@ -82,25 +55,29 @@ def generate_relevance_score(
         prompt_papers = all_papers[id:id+num_paper_in_prompt]
         prompt = encode_prompt(query, prompt_papers)
 
-        decoding_args = utils.OpenAIDecodingArguments(
+        result = utils.openai_structured_completion(
+            prompt=prompt,
+            model_name=model_name,
+            response_format=RelevancyBatch,
             temperature=temperature,
-            n=1,
-            max_tokens=128*num_paper_in_prompt, # The response for each paper should be less than 128 tokens.
+            max_tokens=128 * num_paper_in_prompt,
             top_p=top_p,
         )
-        response = utils.openai_completion(
-            prompts=prompt,
-            model_name=model_name,
-            batch_size=1,
-            decoding_args=decoding_args,
-            logit_bias={"100257": -100},  # prevent the <|endoftext|> from being generated
-        )
 
-        batch_data = post_process_chat_gpt_response(prompt_papers, response, threshold_score=threshold_score)
-        ans_data.extend(batch_data)
+        if result is None:
+            continue
+
+        for idx, paper_score in enumerate(result.papers):
+            if idx >= len(prompt_papers):
+                break
+            score = paper_score.relevancy_score
+            if score < threshold_score:
+                continue
+            prompt_papers[idx]["Relevancy score"] = score
+            prompt_papers[idx]["Reasons for match"] = paper_score.reasons_for_match
+            ans_data.append(prompt_papers[idx])
 
     if sorting:
         ans_data = sorted(ans_data, key=lambda x: int(x["Relevancy score"]), reverse=True)
 
     return ans_data
-
