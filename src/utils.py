@@ -9,7 +9,6 @@ def openai_structured_completion(
     model_name,
     response_format,
     temperature=0.2,
-    max_tokens=1800,
     top_p=1.0,
     sleep_time=2,
 ):
@@ -26,7 +25,6 @@ def openai_structured_completion(
                 ],
                 response_format=response_format,
                 temperature=temperature,
-                max_tokens=max_tokens,
                 top_p=top_p,
             )
             return completion.choices[0].message.parsed

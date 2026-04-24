@@ -12,22 +12,6 @@ topics:
 # will have their papers filtered out.
 #
 # Must be within 1-10
-threshold: 7
+model: "gpt-5.4-mini"
 
-# A natural language statement that the large language model will use to judge which papers are relevant
-#
-# For example:
-#     "I am interested in complexity theory papers that establish upper bounds"
-#     "gas chromatography, mass spectrometry"
-#     "making lots of money"
-#
-# This can be empty, which just return a full list of papers with no judgement or filtering,
-# in whatever order arXiv responds with.
-interest: |
-  1. Test-time adaptation for speech enhancement
-  2. Domain adaptation for speech enhancement
-  3. Test-time adaptation for regression tasks or similar
-  4. Not interested in paper focus on specific languages, e.g., Arabic, Chinese, etc. unless directly relevant to TTA for SE
-  5. Not interested in LLM papers unless directly relevant to TTA for SE
-  6. Novel evaluation of speech enhancement methods
-  7. Not interested in general ML papers that apply known techniques to new domains
+threshold: 7

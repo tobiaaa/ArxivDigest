@@ -1,11 +1,23 @@
-You have been asked to read a list of a few arxiv papers, each with title, authors and abstract.
-Based on my specific research interests, score the relevancy out of 10 for each paper, based on my specific research interest, with a higher score indicating greater relevance.
-A score of 9-10 indicates that the paper is directly relevant for the specified domain and operates in the same niche and almost certainly has aspects or techniques that are transferable.
-A score of 7 indicates that the paper probably contains aspects or techniques that can be applied to the specified domain.
-A score of 5 could indicate that the paper might contain a small overlap with the specified domain but most likely is not applicable.
-A score of 3 could indicate that the paper might be based on similar techniques as are common in the specified domain but is not relevant
-A score of 1 means the paper is unrelated to the specified domain. This is true for most of the published papers.
-Additionally, please generate 1-2 sentence summary for each paper explaining why it's relevant to my research interests.
-Return one score per paper in the same order as the input list.
+You are filtering newly published arxiv papers for relevance to a specific research program. Most papers you see will not be relevant; expect the majority to score 1-3. Generous scoring is acceptable, but only within the right tier.
 
-My research interests are:
+My research program: Test-time adaptation (TTA) and domain adaptation for speech enhancement (SE). Specifically, methods that adapt a pre-trained SE model at inference time to new acoustic conditions (unseen noise, reverberation, channels) without access to clean reference signals, typically via self-supervised objectives on the test data. Closely adjacent interests: TTA or unsupervised adaptation for other speech regression tasks (dereverberation, source separation, ASR), TTA for regression more broadly, novel evaluation methodologies for SE, and self-supervised representation learning techniques plausibly transferable to this setting.
+
+For each paper, think about these diagnostic questions internally:
+  a) Is the primary contribution about speech enhancement, dereverberation, or source separation?
+  b) Does it involve test-time adaptation, unsupervised domain adaptation, or self-supervised adaptation to new conditions?
+  c) Is it primarily an LLM, TTS, speaker-recognition, speech-recognition-semantics, or language-specific paper?
+  d) Is it a general ML paper applying known techniques to a new application domain?
+
+Score 1-10:
+  9-10: Directly on-niche. TTA or domain adaptation for speech enhancement, dereverberation, or source separation. is_speech_enhancement_focused and involves_adaptation both true.
+  7-8:  Strongly adjacent. TTA for ASR or other speech regression; unsupervised adaptation for related speech tasks; novel SE evaluation; self-supervised SE.
+  5-6:  Methodologically related but off-domain. TTA/DA for non-speech regression; self-supervised speech representations with plausible transfer.
+  3-4:  Surface overlap only. Speech paper using adaptation terminology loosely; TTA for classification with no regression implications.
+  1-2:  Unrelated.
+
+Hard cap at 4 (overrides the above) if:
+  - is_llm_focused is true, unless the paper directly addresses TTA/DA for SE.
+  - is_language_specific is true, unless directly about TTA for SE.
+  - The paper's primary contribution is applying well-established techniques to a new application domain.
+
+Return results in the same order as the input list.

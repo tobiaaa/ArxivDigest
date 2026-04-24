@@ -9,6 +9,10 @@ with open("src/relevancy_prompt.txt") as f:
 
 
 class PaperScore(BaseModel):
+    is_speech_enhancement_focused: bool
+    involves_adaptation: bool
+    is_llm_focused: bool
+    is_language_specific: bool
     relevancy_score: int
     reasons_for_match: str
 
@@ -17,10 +21,8 @@ class RelevancyBatch(BaseModel):
     papers: List[PaperScore]
 
 
-def encode_prompt(query, prompt_papers):
-    """Encode multiple prompt instructions into a single string."""
+def encode_prompt(prompt_papers):
     prompt = _RELEVANCY_PROMPT + "\n"
-    prompt += query['interest']
 
     for idx, task_dict in enumerate(prompt_papers):
         (title, authors, abstract) = task_dict["title"], task_dict["authors"], task_dict["abstract"]
@@ -42,8 +44,7 @@ def process_subject_fields(subjects):
 
 def generate_relevance_score(
     all_papers,
-    query,
-    model_name="gpt-4o-mini",
+    model_name,
     threshold_score=8,
     num_paper_in_prompt=4,
     temperature=0.4,
@@ -53,14 +54,13 @@ def generate_relevance_score(
     ans_data = []
     for id in tqdm.tqdm(range(0, len(all_papers), num_paper_in_prompt)):
         prompt_papers = all_papers[id:id+num_paper_in_prompt]
-        prompt = encode_prompt(query, prompt_papers)
+        prompt = encode_prompt(prompt_papers)
 
         result = utils.openai_structured_completion(
             prompt=prompt,
             model_name=model_name,
             response_format=RelevancyBatch,
             temperature=temperature,
-            max_tokens=128 * num_paper_in_prompt,
             top_p=top_p,
         )
 

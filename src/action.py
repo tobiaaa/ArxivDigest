@@ -1,6 +1,3 @@
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
-
 from datetime import date
 
 import argparse
@@ -232,7 +229,7 @@ def get_field_abbr(topic):
         raise RuntimeError(f"Invalid topic {topic}")
 
 
-def generate_body(topic_configs, interest, threshold):
+def generate_body(topic_configs, threshold, model):
     seen = {}  # main_page -> paper, for deduplication across topics
     for entry in topic_configs:
         topic = entry["topic"]
@@ -263,29 +260,21 @@ def generate_body(topic_configs, interest, threshold):
             elif not cats:
                 matched.append(entry["topic"])
         paper["matched_topics"] = " · ".join(matched)
-    if interest:
-        relevancy = generate_relevance_score(
-            papers,
-            query={"interest": interest},
-            threshold_score=threshold,
-            num_paper_in_prompt=16,
-        )
-        body = date.today().strftime("<h1>Arxiv Digest %d %b %Y</h1>")
-        body += "<br><br>".join(
-            [
-                f'Title: <a href="{paper["main_page"]}">{paper["title"]}</a><br>Authors: {paper["authors"]}<br>Subjects: {paper["matched_topics"]}<br>Score: {paper["Relevancy score"]}<br>Reason: {paper["Reasons for match"]}'
-                for paper in relevancy
-            ]
-        )
-        if len(relevancy) == 0:
-            body += "<br>No relevant papers today"
-    else:
-        body = "<br><br>".join(
-            [
-                f'Title: <a href="{paper["main_page"]}">{paper["title"]}</a><br>Authors: {paper["authors"]}<br>Subjects: {paper["matched_topics"]}'
-                for paper in papers
-            ]
-        )
+    relevancy = generate_relevance_score(
+        papers,
+        model_name=model,
+        threshold_score=threshold,
+        num_paper_in_prompt=16,
+    )
+    body = date.today().strftime("<h1>Arxiv Digest %d %b %Y</h1>")
+    body += "<br><br>".join(
+        [
+            f'Title: <a href="{paper["main_page"]}">{paper["title"]}</a><br>Authors: {paper["authors"]}<br>Subjects: {paper["matched_topics"]}<br>Score: {paper["Relevancy score"]}<br>Reason: {paper["Reasons for match"]}'
+            for paper in relevancy
+        ]
+    )
+    if len(relevancy) == 0:
+        body += "<br>No relevant papers today"
     return body
 
 
@@ -305,27 +294,8 @@ if __name__ == "__main__":
         raise RuntimeError("No openai api key found")
 
     topic_configs = config["topics"]
-    from_email = os.environ.get("FROM_EMAIL")
-    to_email = os.environ.get("TO_EMAIL")
     threshold = config["threshold"]
-    interest = config["interest"]
-    body = generate_body(topic_configs, interest, threshold)
+    model = config["model"]
+    body = generate_body(topic_configs, threshold, model)
     with open("digest.html", "w") as f:
         f.write(body)
-    if os.environ.get("SENDGRID_API_KEY", None):
-        sg = SendGridAPIClient(api_key=os.environ.get("SENDGRID_API_KEY"))
-        from_email = Email(from_email)  # Change to your verified sender
-        to_email = To(to_email)
-        subject = date.today().strftime("Personalized arXiv Digest, %d %b %Y")
-        content = Content("text/html", body)
-        mail = Mail(from_email, to_email, subject, content)
-        mail_json = mail.get()
-
-        # Send an HTTP POST request to /mail/send
-        response = sg.client.mail.send.post(request_body=mail_json)
-        if response.status_code >= 200 and response.status_code <= 300:
-            logging.info("Email sent successfully")
-        else:
-            logging.error(f"Failed to send email ({response.status_code}: {response.text})")
-    else:
-        logging.info("No SendGrid API key found, skipping email")
